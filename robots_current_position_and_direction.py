@@ -46,59 +46,58 @@ WEST = 3
 # Each cell has 5 elements: [top, right, bottom, left, visited]
 maze = np.zeros((GRID_SIZE, GRID_SIZE, 5), dtype=int)
 # Initialize the maze with walls
-for i in range(GRID_SIZE):
-    for j in range(GRID_SIZE):
-        if i == 0:
-            maze[i][j][0] = 1  # Top wall
-        if j == GRID_SIZE - 1:
-            maze[i][j][1] = 1  # Right wall
-        if i == GRID_SIZE - 1:
-            maze[i][j][2] = 1  # Bottom wall
-        if j == 0:
-            maze[i][j][3] = 1  # Left wall
+for x in range(GRID_SIZE):
+    for y in range(GRID_SIZE):
+        if y == GRID_SIZE - 1:
+            maze[x][y][0] = 1  # Top wall (highest y)
+        if x == GRID_SIZE - 1:
+            maze[x][y][1] = 1  # Right wall (highest x)
+        if y == 0:
+            maze[x][y][2] = 1  # Bottom wall (lowest y)
+        if x == 0:
+            maze[x][y][3] = 1  # Left wall (lowest x)
     
+# changed from LAB 3: VNESW to LAB 4: VWNES
+# Replace your current print_maze() with:
 def print_maze():
-    """Print the maze with correct row/col indexing but simple separators."""
+    print("________________________________________________________________________________")
     
-    # Fixed simple header instead of dynamic underscores
-    print("=========================== MAZE ==========================")
-
-    for row in range(GRID_SIZE):  # row = y-axis
+    # Print matrix rows from 7 down to 0 (top to bottom)
+    for matrix_row in range(GRID_SIZE-1, -1, -1):
         
-        #  Top walls of this row
-        top_row = "|  " + "\t  ".join(str(maze[row][col][0]) for col in range(GRID_SIZE)) + "    |"
+        # Get visited status
+        visited_chars = []
+        for matrix_col in range(8):
+            if maze[matrix_col][matrix_row][4] == 0:  # Note: [x][y] indexing
+                visited_chars.append("?")
+            else:
+                visited_chars.append("V")
         
-        #  Middle row with left/right walls + visited info
-        middle_row = "|" + "\t".join(
-            f"{maze[row][col][3]} {'V' if maze[row][col][4] else '?'} {maze[row][col][1]}"
-            for col in range(GRID_SIZE)
-        ) + "  |"
-        
-        #  Bottom walls of this row
-        bottom_row = "|  " + "\t  ".join(str(maze[row][col][2]) for col in range(GRID_SIZE)) + "    |"
-        
-        # Print the row contents
+        # Print walls and visited status
+        top_row = "|  " + "\t  ".join(str(maze[matrix_col][matrix_row][0]) for matrix_col in range(8)) + "    |"
         print(top_row)
+        
+        middle_parts = []
+        for matrix_col in range(8):
+            cell_part = f"{maze[matrix_col][matrix_row][3]} {visited_chars[matrix_col]} {maze[matrix_col][matrix_row][1]}"
+            middle_parts.append(cell_part)
+        middle_row = "|" + "\t".join(middle_parts) + "  |"
         print(middle_row)
+        
+        bottom_row = "|  " + "\t  ".join(str(maze[matrix_col][matrix_row][2]) for matrix_col in range(8)) + "    |"
         print(bottom_row)
         
-        # Instead of complex underscores, just a simple fixed separator
-        print("___________________________________________________________")
-    
-    # Footer separator
-    print("==========================================================\n")
-
+        if matrix_row == 0:  # Changed from 7 to 0 since we're printing in reverse
+            print("|_______________________________________________________________________________|\n")
+        else:
+            print("|                                                                               |")
 def gps_to_cell(x, y):
-    """
-    Map world coords X,Y in [–1,+1] to grid cols/rows [0..7],
-    with (–1,–1) → (0,0) in the bottom‐left and (+1,+1) → (7,7) top‐right.
-    """
     # raw indices 0..7
     gx = int((x - WORLD_MIN) // CELL_SIZE)
     gy = int((y - WORLD_MIN) // CELL_SIZE)
-    # flip gy so that high Y → high row
-    gy = (GRID_SIZE - 1) - gy
-
+    
+    # No flipping needed - this will make (0,0) the bottom-left
+    
     # clamp into [0,7]
     gx = max(0, min(GRID_SIZE-1, gx))
     gy = max(0, min(GRID_SIZE-1, gy))
@@ -123,28 +122,11 @@ def is_front_clear():
     front_distance = lidar_values[len(lidar_values)//2]
     return front_distance > CELL_SIZE * 0.8  # 0.8 to be safe
 
-def move_forward_one_cell():
-    start_pos = gps.getValues()
-    while robot.step(timestep) != -1:
-        if not is_front_clear():
-            left_motor.setVelocity(0)
-            right_motor.setVelocity(0)
-            print("Obstacle ahead!")
-            return False
-        left_motor.setVelocity(max_speed)
-        right_motor.setVelocity(max_speed)
-        pos = gps.getValues()
-        dx = pos[0] - start_pos[0]
-        dz = pos[2] - start_pos[2]
-        distance = math.sqrt(dx*dx + dz*dz)
-        if distance >= CELL_SIZE * 0.95:
-            break
-    left_motor.setVelocity(0)
-    right_motor.setVelocity(0)
-    return True
+
 
 def mark_current_cell_visited(x,y):
     maze[x][y][4] = 1  # Mark as visited
+
 
 
 
@@ -152,12 +134,14 @@ while robot.step(timestep) != -1:
     pos = gps.getValues()
     x, y, z = pos
     gx, gy = gps_to_cell(x, y)
-    print(f"GPS: ({x:.3f}, {y:.3f}, {z:.3f}) -> Grid Cell: ({gx}, {gy})")
-    # print("robot pointing", get_robot_direction())
-    # move_forward_one_cell()
+
+    
+    left_motor.setVelocity(max_speed)
+    right_motor.setVelocity(max_speed)
+    print("matrix position before:", maze[gx][gy])
     mark_current_cell_visited(gx, gy)
-    # maze[7][1][4] = 1 
     print_maze()
     print(f"Current cell visited: ({gx}, {gy})")
+    print("matrix position after:", maze[gx][gy])
 
     
