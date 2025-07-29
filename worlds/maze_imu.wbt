@@ -504,8 +504,8 @@ Solid {
   model "rectangle arena"
 }
 Solid {
-  translation 0.00526175 -0.75308 0.05
-  rotation 0 0 1 1.57
+  translation 0.005254722975384561 -0.7502965074473895 0.04990304032102927
+  rotation -0.00012844196730371716 -1.0970883435824588e-05 0.9999999916911504 1.5700001879492163
   children [
     Shape {
       geometry Box {
@@ -521,10 +521,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity -5.366957319563603e-08 6.044553830079736e-06 -1.9761580989552385e-07
+  angularVelocity 1.1564230918439174e-06 -2.8266982989236757e-07 9.117679827971306e-08
 }
 Solid {
-  translation 0.495717 0.252498 0.05
-  rotation 0 0 1 1.57
+  translation 0.49945287633792007 0.25247975713807064 0.04990158636484428
+  rotation 0.0012072105511873644 0.0012231386118706263 0.9999985232862202 1.584455287885754
   children [
     Shape {
       geometry Box {
@@ -540,10 +542,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 2.5425382481339473e-06 4.190610368991423e-08 -1.8264227151113203e-08
+  angularVelocity 2.2303582726666844e-09 -1.2855646053807141e-05 1.2495668303470494e-05
 }
 Solid {
-  translation -0.000262478 0.250549 0.05
-  rotation 0 0 1 1.57
+  translation -0.003663140299176674 0.24839527116016835 0.04990169410002668
+  rotation -0.0012482996205075752 -0.0013058810951819197 0.99999836820998 1.5569063251726878
   children [
     Shape {
       geometry Box {
@@ -559,10 +563,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity -2.3883106830374418e-06 -6.01302568222927e-06 -2.2482685255906874e-07
+  angularVelocity -2.3985728899013405e-06 1.5451693278073653e-05 -1.2381833505294131e-05
 }
 Solid {
-  translation -0.000256299 0.741013 0.05
-  rotation 0 0 1 1.57
+  translation -0.00026643207101564615 0.7482411646412743 0.04990187280105749
+  rotation -0.00013866489244214616 -6.436534827834285e-05 0.9999999883145747 1.5699998578906655
   children [
     Shape {
       geometry Box {
@@ -578,10 +584,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 7.740959602175746e-07 5.9154936126972755e-06 -6.246581858704303e-08
+  angularVelocity 3.2381346445874646e-06 1.547534271677567e-05 -1.5576112931408933e-07
 }
 Solid {
-  translation -0.501744 0.74894 0.05
-  rotation 0 0 1 1.57
+  translation -0.501744 0.74894 0.04990199684533919
+  rotation 1.0826935494583311e-16 1.4229699198788438e-16 1 1.5699999999999998
   children [
     Shape {
       geometry Box {
@@ -597,10 +605,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 8.111834585045905e-17 1.7220501254267356e-18 -7.570665716799425e-07
+  angularVelocity 8.322376035780582e-17 1.617483547681588e-15 -6.582864414382696e-18
 }
 Solid {
-  translation -0.506351 -0.247061 0.05
-  rotation 0 0 1 1.57
+  translation -0.5063508192832558 -0.24575191708415267 0.04990198749545901
+  rotation -3.6030871330224666e-05 3.93821419160908e-05 0.9999999985754116 1.5699999996127358
   children [
     Shape {
       geometry Box {
@@ -616,10 +626,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 9.65867376455378e-09 7.485578451223859e-06 -7.573616026660893e-07
+  angularVelocity -5.825093037232282e-07 4.245418058311897e-08 -1.880398122805919e-08
 }
 Solid {
-  translation -0.507348 -0.744241 0.05
-  rotation 0 0 1 1.57
+  translation -0.5073481943647472 -0.74555248948973 0.04990200591027355
+  rotation 3.5931088576254376e-05 -3.955539875120869e-05 0.9999999985721636 1.569999999489445
   children [
     Shape {
       geometry Box {
@@ -635,9 +647,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity -1.0553028863241615e-08 -1.2762337080972107e-05 -7.56776505340794e-07
+  angularVelocity 5.84846676094015e-07 -6.034120692902174e-08 -1.8796972879014728e-08
 }
 Solid {
-  translation 0.246415 -0.503387 0.05
+  translation 0.24638394003028927 -0.49923011799191563 0.04990139057807317
+  rotation -0.17291729917122228 0.001315011110711346 -0.9849354691517149 0.016308671129166317
   children [
     Shape {
       geometry Box {
@@ -653,9 +668,12 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 6.685080380423504e-08 4.633940875606925e-06 9.56188724784743e-08
+  angularVelocity 1.3315658423667788e-05 3.336264995670487e-07 -2.0635104619668836e-05
 }
 Solid {
-  translation 0.24789 0.00509975 0.05
+  translation 0.2478899937969865 0.005092590418578827 0.049902167770502985
+  rotation 0.9999872848232397 0.005024778572802 0.00042637089389546066 0.00014085069030809794
   children [
     Shape {
       geometry Box {
@@ -671,23 +689,16 @@ Solid {
   }
   physics Physics {
   }
+  linearVelocity 3.606532528288575e-08 -1.0997534049004553e-06 4.898090173810488e-08
+  angularVelocity 2.022212550164072e-05 7.860804679116636e-07 4.806884420541127e-08
 }
 Robot {
-  translation -0.731681 -0.742108 -1.25485e-14
-  rotation 0 0 -1 -1.5700053071795859
+  translation -0.723675172784778 -0.7417125457723196 -0.00016470633632173666
+  rotation 0.001903747446633052 -0.011464814666105341 0.9999324646046509 0.035443806336812336
   children [
-    Display {
-      name "my_display"
-      width 128
-      height 128
-    }
-    Camera {
-      translation 0.005 0 0.0786603
-      rotation 0 -1 0 -0.261795307179586
-      name "camera1"
-      fieldOfView 1
-      width 128
-      height 128
+    InertialUnit {
+      translation -0.02 -7.34642e-08 0
+      rotation 0 0 1 1.5708
     }
     DEF EPUCK_LIDAR Lidar {
       translation 0.03 0 0.035
@@ -712,6 +723,7 @@ Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 3.1266739479122734
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -728,7 +740,7 @@ Robot {
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
         translation 0 0.02599999999998993 0.02
-        rotation 0 1 0 0
+        rotation 0 1 0 3.1266739479122734
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -860,10 +872,13 @@ Robot {
           density -1
           mass 0.5
         }
+        linearVelocity 0.12557914406203752 0.004437360524445767 -1.5682240566320462e-05
+        angularVelocity -0.22232218919754432 6.279156447714872 0.0003764905772517262
       }
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position -2.325534309279002
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -879,8 +894,8 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.025999999999989 0.02
-        rotation 0 1 0 0
+        translation 0 -0.025999999999988997 0.02
+        rotation 0 -1 0 2.325534309279002
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -892,6 +907,8 @@ Robot {
         name "right wheel"
         boundingObject USE EPUCK_WHEEL_BOUNDING_OBJECT
         physics USE EPUCK_WHEEL_PHYSICS
+        linearVelocity 0.12557795995534188 0.0044676752405456615 -1.8606772355610655e-05
+        angularVelocity -0.22335086029546466 6.279119940472889 0.0006114429113974718
       }
     }
     DEF BATTERY_CONNECTOR Pose {
@@ -2276,6 +2293,8 @@ Robot {
       0 0 0
     ]
   }
-  controller "e_puck_custom_controller2"
+  controller "e_puck_custom_controller_imu"
   cpuConsumption 1.11
+  linearVelocity 0.12557272280965917 0.004446079177977432 -2.1059820361060122e-05
+  angularVelocity -0.0001984691472632406 0.0030862962704022406 -0.0003278838163421106
 }

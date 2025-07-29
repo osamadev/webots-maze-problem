@@ -1,15 +1,15 @@
-import math
 from controller import Robot, Display
+import cv2
+import math
 import numpy as np
 from collections import defaultdict
-import cv2
-import numpy as np
+import json
 
 TIME_STEP = 64
 MAX_SPEED = 6.28
 SAFE_DISTANCE = 0.3  # distance to trigger avoidance
 TURN_TIME = 14       # steps to force a turn
-TURN_SPEED_MOD = 0.97
+TURN_SPEED_MOD = 0.8
 FORWARD_TIME = 61
 error = 0.07
 
@@ -27,6 +27,11 @@ rightMotor.setVelocity(0.0)
 lidar = robot.getDevice('lidar')
 lidar.enable(TIME_STEP)
 
+# create map
+grid_x = 4
+grid_y = 4
+grid_size = 0.5
+
 # Camera
 camera = robot.getDevice('camera1')
 camera.enable(TIME_STEP)
@@ -35,36 +40,54 @@ height = camera.getHeight()
 display = robot.getDevice("my_display") # Replace "my_display" with your display's name
 
 
-# create map
-grid_x = 4
-grid_y = 4
-grid_size = 0.5
-
 # should try to read from file first
-map = [[['?','?','?','?'] for x in range(grid_x)] for y in range(grid_y)]
+try:
+    with open('map.json') as f:
+        map = json.load(f)
+
+except:
+    map = [[['?','?','?','?'] for x in range(grid_x)] for y in range(grid_y)]
+
+
+def wrap_angle(a):
+    # map to (-pi, pi]
+    return (a + np.pi) % (2*np.pi) - np.pi
+
+class ThetaKF:
+    """1D KF for heading error (theta_adjustment). State: x ~ heading error."""
+    def __init__(self, q=1e-4, init_var=1e-2):
+        self.x = 0.0           # estimated heading error (rad)
+        self.P = float(init_var)
+        self.q = float(q)      # process noise power (rad^2 / s)
+
+    def predict(self, dt, gyro_bias_comp=None):
+        # Random-walk model for error; optionally nudge with a (small) bias if you have one
+        # x_k|k-1 = x_{k-1}  (no control on error); P_k|k-1 = P + q*dt
+        self.P += self.q * max(dt, 1e-3)
+
+    def update(self, z, R):
+        # z is an angle error in radians (measurement of same quantity)
+        if z is None or R is None:
+            return
+        # Innovation
+        y = wrap_angle(z - self.x)
+        S = self.P + R
+        K = self.P / S
+        # Update
+        self.x = wrap_angle(self.x + K * y)
+        self.P = (1.0 - K) * self.P
+
 
 
 # holding state variables in dict for easier management of variable scope
 state_dict = {}
+state_dict['theta_kf'] = ThetaKF(q=2e-4, init_var=1e-2)  # tune q/init_var as needed
 state_dict['state_var'] = [0.5,0.5,0.0]
-state_dict['goal_stack'] = [("mapping",None),("calibrate_state",None)]
+state_dict['goal_stack'] = [("race",(2,0)),("mapping",None),("calibrate_state",None)]
 state_dict['map'] = map
 state_dict['turn_flag'] = False
 state_dict['forward_flag'] = False
 state_dict['move_flag'] = False
-
-# def get_front_distance(ranges):
-    # n = len(ranges)
-    # return min(ranges[int(0.45*n):int(0.55*n)])
-
-dilate_kernel = np.ones((3, 3))
-def preprocess(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # mild denoise, then edge detection
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blur, 40, 120, L2gradient=True)
-    edges = cv2.dilate(edges, dilate_kernel, iterations=1)
-    return edges
 
 
 def format_radians(theta):
@@ -315,11 +338,12 @@ def mapping():
 
 
     nearest_unmapped = check_map(state_dict['map'],state_dict['state_var'])
-    print("Nearest unmmaped", nearest_unmapped)
 
     if not nearest_unmapped:
 
         state_dict['goal_stack'].pop(-1)
+        with open('map.json','w') as f:
+            json.dump(state_dict['map'],f)
 
     else:
         current_x = int(state_dict['state_var'][0])
@@ -351,11 +375,11 @@ def map_current():
 
 def scan():
     scan_pos = get_scan_positions()
-    print("scan_pos",scan_pos)
+    # print("scan_pos",scan_pos)
     ranges = lidar.getRangeImage()
 
     state_var = state_dict['state_var']
-    print("state_var",state_var)
+    # print("state_var",state_var)
     x_a = scan_pos[0][0]
     y_a = scan_pos[0][1]
     facing_a = scan_pos[0][2]
@@ -370,7 +394,7 @@ def scan():
     facing_b = scan_pos[1][2]
     # b can look off map. Check is in map
     if x_b>=0 and x_b<grid_x and y_b>=0 and y_b<grid_y:
-        if state_dict['map'][y_b][x_b][facing_b] == '?':
+        if state_dict['map'][y_b][x_b][facing_b] == '?' and not get_lidar_c(ranges,state_var):
             if get_lidar_b(ranges,state_var):
                 state_dict['map'][y_b][x_b][facing_b] = 1
             else:
@@ -379,21 +403,21 @@ def scan():
     x_c = scan_pos[2][0]
     y_c = scan_pos[2][1]
     facing_c = scan_pos[2][2]
-    print(state_dict['map'][y_c][x_c][facing_c])
+    # print(state_dict['map'][y_c][x_c][facing_c])
     if state_dict['map'][y_c][x_c][facing_c] == '?':
-        print("lidar_c",get_lidar_c(ranges,state_var))
+        # print("lidar_c",get_lidar_c(ranges,state_var))
         if get_lidar_c(ranges,state_var):
             state_dict['map'][y_c][x_c][facing_c] = 1
         else:
             state_dict['map'][y_c][x_c][facing_c] = 0
-    print(state_dict['map'][y_c][x_c][facing_c])
+    # print(state_dict['map'][y_c][x_c][facing_c])
 
     x_d = scan_pos[3][0]
     y_d = scan_pos[3][1]
     facing_d = scan_pos[3][2]
     # d can look off map. Check is in map
     if x_d>=0 and x_d<grid_x and y_d>=0 and y_d<grid_y:
-        if state_dict['map'][y_d][x_d][facing_d] == '?':
+        if state_dict['map'][y_d][x_d][facing_d] == '?' and not get_lidar_c(ranges,state_var):
             if get_lidar_d(ranges,state_var):
                 state_dict['map'][y_d][x_d][facing_d] = 1
             else:
@@ -580,23 +604,38 @@ def _wrap_to_pi(a: float) -> float:
     return (a + math.pi) % (2 * math.pi) - math.pi
 
 
-def theta_adjustment_from_points(ideal_pt, observed_pt, eps=1e-6) -> float:
+def theta_adjustment_from_points(ideal_pt, observed_pt,
+                                 img_width: int = None,
+                                 hfov: float = None,     # radians
+                                 fx: float = None,       # focal length in pixels
+                                 cx: float = None,       # principal point x in pixels
+                                 eps: float = 1e-6) -> float:
     """
-    Compute yaw error (radians) so the robot rotates to make observed_pt align with ideal_pt.
-    Both points are in the robot-centric XY frame, robot at (0,0).
+    Compute yaw error (radians) using ONLY the horizontal pixel coordinate.
+    Positive => turn LEFT (CCW), Negative => turn RIGHT (CW).
     """
-    ix, iy = float(ideal_pt[0]), float(ideal_pt[1])
-    ox, oy = float(observed_pt[0]), float(observed_pt[1])
+    ix = float(ideal_pt[0])
+    ox = float(observed_pt[0])
 
-    # If the observed point is too close to the origin, the bearing is unreliable.
-    if abs(ox) < eps and abs(oy) < eps:
-        return 0.0
+    # Derive cx and fx if not provided
+    if cx is None and img_width is not None:
+        cx = 0.5 * img_width
+    if fx is None:
+        if hfov is not None and img_width is not None and img_width > 0:
+            fx = (0.5 * img_width) / math.tan(0.5 * hfov)
+        else:
+            raise ValueError("Provide fx, or both img_width and hfov, to compute angle from x.")
 
-    phi_ideal = math.atan2(iy, ix)    # bearing to ideal feature
-    phi_obs   = math.atan2(oy, ox)    # bearing to observed feature
+    fx = max(fx, eps)
+    if cx is None:
+        raise ValueError("cx is required (or provide img_width to set cx = img_width/2).")
 
-    # Positive result => rotate left; negative => rotate right
-    return _wrap_to_pi(phi_obs - phi_ideal)
+    # Bearing from x only
+    phi_ideal = math.atan((ix - cx) / fx)
+    phi_obs   = math.atan((ox - cx) / fx)
+
+    # FIX: use ideal - observed (was observed - ideal)
+    return _wrap_to_pi(phi_ideal - phi_obs)
 
 
 def calibrate_state():
@@ -605,14 +644,14 @@ def calibrate_state():
     ranges = lidar.getRangeImage()
     current_facing = get_facing(state_dict['state_var'])
 
-    theta_adjustment = 0
-    forward_adjustment = 0
     has_left_wall = False
     has_right_wall = False
-    # use left wall to attempt theta correction
-    print(get_lidar_a(ranges,state_dict['state_var']),get_lidar_b(ranges,state_dict['state_var']),get_lidar_c(ranges,state_dict['state_var']),get_lidar_d(ranges,state_dict['state_var']),get_lidar_e(ranges,state_dict['state_var']))
+
+    theta_lidar = None   # rad
+    theta_cv = None      # rad
+
     if get_lidar_a(ranges,state_dict['state_var']):
-        print("use LEFT wall")
+
         has_left_wall = True
         start_alpha = (np.pi-2.9)/2
         sample = ranges[0:53:10]
@@ -628,15 +667,14 @@ def calibrate_state():
         gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[-1] / opposite))
 
         # print('left',gamma_expected,gamma_actual,gamma_actual - gamma_expected)
-        theta_adjustment = gamma_actual - gamma_expected
-        state_dict['state_var'][2] += theta_adjustment
+        theta_lidar = gamma_actual - gamma_expected
+        # state_dict['state_var'][2] += theta_adjustment
 
 
 
     # use right wall to attempt theta correction
     elif get_lidar_e(ranges,state_dict['state_var']):
 
-        print("use RIGHT wall")
         has_right_wall = True
         start_alpha = (np.pi-2.9)/2 + 2.6
         sample = ranges[459:512:10]
@@ -652,64 +690,160 @@ def calibrate_state():
         gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[0] / opposite))
 
         # print('right',gamma_expected,gamma_actual,gamma_expected - gamma_actual)
-        theta_adjustment = gamma_expected - gamma_actual
-        state_dict['state_var'][2] += theta_adjustment
+        theta_lidar = gamma_expected - gamma_actual
+        # state_dict['state_var'][2] += theta_adjustment
 
+    # use forward left wall
+    # elif get_lidar_b(ranges,state_dict['state_var']): -
+    # turn off for now with a False condition
+    elif ranges[124] < ranges[159] and ranges[159] - ranges[124] < 0.5 and False:
 
-    ideal_nearest_point = (65, 75)        # ideal pixel when robot faces perfectly straight
+        # print('b',ranges[124],ranges[159])
+        start_alpha = (np.pi-2.9)/2 + 0.7
+        sample = ranges[124:159:10]
+        # alpha is angle relative to -x direction (robot frame)
+        alpha = [start_alpha+i*10/512*2.9 for i in range(len(sample))]
+        theta = alpha[-1]-alpha[0]
+        gamma_expected = np.pi/2 + start_alpha
+
+        # cosine rule
+        opposite = (sample[0]**2 + sample[-1]**2 - 2*sample[0]*sample[-1]*np.cos(theta))**0.5
+
+        # sine rule (obtuse angle)
+        gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[-1] / opposite))
+
+        # print('left',gamma_expected,gamma_actual,gamma_actual - gamma_expected)
+        theta_lidar = gamma_actual - gamma_expected
+        # state_dict['state_var'][2] += theta_adjustment
+
+    # use forward right
+    # elif get_lidar_d(ranges,state_dict['state_var']):
+    # turn off for now with a False condition
+    elif ranges[353] > ranges[388] and ranges[353] - ranges[388] < 0.5 and False:
+
+        # print('d',ranges[353],ranges[388])
+        start_alpha = (np.pi-2.9)/2 + 2
+        sample = ranges[353:388:10]
+        # alpha is angle relative to -x direction (robot frame)
+        alpha = [start_alpha+i*10/512*2.9 for i in range(len(sample))]
+        theta = alpha[-1]-alpha[0]
+        gamma_expected = np.pi/2 + (np.pi-2.9)/2
+
+        # cosine rule
+        opposite = (sample[0]**2 + sample[-1]**2 - 2*sample[0]*sample[-1]*np.cos(theta))**0.5
+
+        # sine rule (obtuse angle)
+        gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[0] / opposite))
+
+        # print('right',gamma_expected,gamma_actual,gamma_expected - gamma_actual)
+        theta_lidar = gamma_expected - gamma_actual
+        # state_dict['state_var'][2] += theta_adjustment
+
+    # use forward measurements for theta instead - switched off for now!!! (<0)
+    elif max(ranges[256:282:10]) < 0:
+
+        start_alpha = 0
+        sample = ranges[256:283:10]
+        alpha = [start_alpha+i*10/512*2.9 for i in range(len(sample))]
+        theta = alpha[-1]-alpha[0]
+
+        # cosine rule
+        opposite = (sample[0]**2 + sample[-1]**2 - 2*sample[0]*sample[-1]*np.cos(theta))**0.5
+
+        gamma_expected = np.pi/2
+
+        if sample[-1] > sample[0]:
+        # obtuse angle
+            gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[0] / opposite))
+        elif sample[0] >= sample[-1]:
+        # acute angle
+            gamma_actual = (np.arcsin(np.sin(theta) * sample[0] / opposite))
+        # print('right',gamma_expected,gamma_actual,gamma_expected - gamma_actual)
+        theta_lidar = -(gamma_expected - gamma_actual)
+
+        # state_dict['state_var'][2] += theta_adjustment
+
+    print("LIDAR theta", theta_lidar)
+    # ---------- CV-based θ ----------
+    ideal_nearest_point = (64, 73)        # pixel when robot faces straight
     nearest_point = find_nearest_intersection()
-    forward_adjustment_cv = 0
     if nearest_point is not None:
-        theta_adjustment_cv = theta_adjustment_from_points(ideal_nearest_point, nearest_point)
-        if not has_left_wall and not has_right_wall:
-            print("Use CV rotation adjustment", theta_adjustment_cv)
-            theta_adjustment = theta_adjustment_cv
+        theta_cv = theta_adjustment_from_points(ideal_nearest_point, nearest_point, img_width=camera.getWidth(), hfov=camera.getFov()
+                                                )  # must return radians
+        # theta_cv = wrap_angle(theta_cv)
+        print("Use CV rotation adjustment", theta_cv)
 
+    # ---------- Kalman fusion ----------
+    kf = state_dict['theta_kf']
+    dt = TIME_STEP / 1000.0
+    kf.predict(dt)
+
+    # Adaptive measurement noise (R) per sensor
+    # Tune these baselines to your setup (values below are examples):
+    R_CV_BASE = np.deg2rad(0.5)**2     # ~1.5° std when geometry is good
+    R_LIDAR_BASE = np.deg2rad(0.5)**2     # ~1.5° std when geometry is good
+    R_LIDAR_WEAK = np.deg2rad(1.0)**2     # when geometry is weak
+
+    # LIDAR R
+    if theta_lidar is not None:
+        R_lidar = R_LIDAR_BASE if (has_left_wall and has_right_wall) else R_LIDAR_WEAK
+        kf.update(theta_lidar, R_lidar)
+
+    # CV R
+    if theta_cv is not None:
+        kf.update(theta_cv, R_CV_BASE)
+
+    # ---------- Apply fused θ once ----------
+    theta_adjustment_fused = kf.x
+    # Optional: clamp extreme jumps if desired
+    theta_adjustment_fused = float(np.clip(theta_adjustment_fused, -np.deg2rad(20), np.deg2rad(20)))
+    theta_adjustment = theta_adjustment_fused
+    print("Final theta", theta_adjustment)
+
+    state_dict['state_var'][2] += theta_adjustment
 
     # use forward wall to attempt x,y correction
+
     if min(ranges[230:282]) < 1:
-        print("use Forward wall")
         min_forward = min(ranges[230:282]) + 0.035 # adding radius of E-Puck
-        print("MIN forward", min_forward, current_facing)
-        if min_forward < 0.3:
-            likely_wall = int(min_forward/0.5)
+        likely_wall = int(min_forward/0.5)
 
 
-            # a large correction likely to be a faulty reading so ingore > 0.2
-            if current_facing == 0:
-                y = state_dict['state_var'][1]
-                square_y =int(y)
-                wall_measured = square_y + likely_wall
-                new_y = wall_measured +1 - min_forward * 2
-                forward_adjustment = new_y - state_dict['state_var'][1]
-                if abs(forward_adjustment) < 0.5:
-                    state_dict['state_var'][1] += forward_adjustment
+        # a large correction likely to be a faulty reading so ingore > 0.2
+        if current_facing == 0:
+            y = state_dict['state_var'][1]
+            square_y =int(y)
+            wall_measured = square_y + likely_wall
+            new_y = wall_measured +1 - min_forward * 2
+            forward_adjustment = new_y - state_dict['state_var'][1]
+            if abs(forward_adjustment) < 0.5:
+                state_dict['state_var'][1] += forward_adjustment
 
-            if current_facing == 1:
-                x = state_dict['state_var'][0]
-                square_x =int(x)
-                wall_measured = square_x + likely_wall
-                new_x = wall_measured +1 - min_forward * 2
-                forward_adjustment = new_x - state_dict['state_var'][0]
-                if abs(forward_adjustment) < 0.5:
-                    state_dict['state_var'][0] += forward_adjustment
+        if current_facing == 1:
+            x = state_dict['state_var'][0]
+            square_x =int(x)
+            wall_measured = square_x + likely_wall
+            new_x = wall_measured +1 - min_forward * 2
+            forward_adjustment = new_x - state_dict['state_var'][0]
+            if abs(forward_adjustment) < 0.5:
+                state_dict['state_var'][0] += forward_adjustment
 
-            if current_facing == 2:
-                y = state_dict['state_var'][1]
-                square_y =int(y)
-                wall_measured = square_y - likely_wall
-                new_y = wall_measured + min_forward * 2
-                forward_adjustment = state_dict['state_var'][1] - new_y
-                if abs(forward_adjustment) < 0.5:
-                    state_dict['state_var'][1] -= forward_adjustment
-            if current_facing == 3:
-                x = state_dict['state_var'][0]
-                square_x =int(x)
-                wall_measured = square_x - likely_wall
-                new_x = wall_measured + min_forward * 2
-                forward_adjustment = state_dict['state_var'][1] - new_x
-                if abs(forward_adjustment) < 0.5:
-                    state_dict['state_var'][0] -= forward_adjustment
+        if current_facing == 2:
+            y = state_dict['state_var'][1]
+            square_y =int(y)
+            wall_measured = square_y - likely_wall
+            new_y = wall_measured + min_forward * 2
+            forward_adjustment = state_dict['state_var'][1] - new_y
+            if abs(forward_adjustment) < 0.5:
+                state_dict['state_var'][1] -= forward_adjustment
+        if current_facing == 3:
+            x = state_dict['state_var'][0]
+            square_x =int(x)
+            wall_measured = square_x - likely_wall
+            new_x = wall_measured + min_forward * 2
+            forward_adjustment = state_dict['state_var'][1] - new_x
+            if abs(forward_adjustment) < 0.5:
+                state_dict['state_var'][0] -= forward_adjustment
 
 
     state_dict['goal_stack'].pop(-1)
@@ -737,9 +871,8 @@ def calibrate_state():
         dist_correction = x-(square_x+0.5)
 
 
-    print("DIST", dist_correction)
+    if abs(dist_correction) > 0.02 and abs(theta_adjustment) <= 0.05:
     # times 0.5 as converfting squares into distance
-    if abs(theta_adjustment) < 0.05 and abs(dist_correction) > 0.02:
         state_dict['goal_stack'].append(('forward_correction',dist_correction*0.5))
 
     if theta_adjustment > 0.05:
@@ -885,6 +1018,16 @@ def move_next(x_y):
         state_dict['goal_stack'].pop(-1)
         state_dict['goal_stack'].append(('forward_correction',None))
 
+def race(x_y):
+    current_x = int(state_dict['state_var'][0])
+    current_y = int(state_dict['state_var'][1])
+    current_facing = get_facing(state_dict['state_var'])
+
+    if current_x == x_y[0] and current_y == x_y[1]:
+        state_dict['goal_stack'].pop(-1)
+
+    else:
+        state_dict['goal_stack'].append(("route",(x_y[0],x_y[1])))
 
 
 def distance_pt(p1, p2):
@@ -1004,6 +1147,16 @@ def detect_segments_any_angle(edges, min_len=10):
     return dedup
 
 
+def preprocess(img):
+    dilate_kernel = np.ones((3, 3))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # mild denoise, then edge detection
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blur, 40, 120, L2gradient=True)
+    edges = cv2.dilate(edges, dilate_kernel, iterations=1)
+    return edges
+
+
 def find_nearest_intersection():
     image_data = camera.getImage()
     img = np.frombuffer(image_data, np.uint8).reshape((height, width, -1))
@@ -1035,7 +1188,7 @@ def find_nearest_intersection():
                     color = (255, 0, 0)    # near vertical
                 else:
                     color = (0, 0, 255)    # other angles
-                cv2.line(vis, (x1, y1), (x2, y2), color, 2)
+                # cv2.line(vis, (x1, y1), (x2, y2), color, 2)
 
     # Compute intersections among *all* pairs of (non-parallel) segments
     intersections = []
@@ -1090,7 +1243,7 @@ def find_nearest_intersection():
 
 
 # behaviours are mapped in this dictionary so the functions can be called with a strong key
-behaviours = {"race":None,
+behaviours = {"race":race,
               "mapping":mapping,
               "map_current":map_current,
               "right_turn":right_turn,
@@ -1105,7 +1258,6 @@ behaviours = {"race":None,
 state = "forward"
 goal_stack_string_buffer = "->".join([str(goal) for goal in state_dict['goal_stack']])
 
-print("============ START ===========")
 while robot.step(TIME_STEP) != -1:
 
     goal_stack_string = "->".join([str(goal) for goal in state_dict['goal_stack']])
@@ -1125,4 +1277,12 @@ while robot.step(TIME_STEP) != -1:
             behaviours[plan[0]]()
     else:
         print("finished")
+
+
+
+
+
+
+
+
 

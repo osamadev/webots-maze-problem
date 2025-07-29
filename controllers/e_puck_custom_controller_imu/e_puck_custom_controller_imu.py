@@ -29,10 +29,12 @@ lidar.enable(TIME_STEP)
 
 # Camera
 camera = robot.getDevice('camera1')
-camera.enable(TIME_STEP)
-width = camera.getWidth()
-height = camera.getHeight()
-display = robot.getDevice("my_display") # Replace "my_display" with your display's name
+imu = robot.getDevice('inertial unit')
+imu.enable(TIME_STEP)
+# camera.enable(TIME_STEP)
+# width = camera.getWidth()
+# height = camera.getHeight()
+# display = robot.getDevice("my_display") # Replace "my_display" with your display's name
 
 
 # create map
@@ -599,153 +601,114 @@ def theta_adjustment_from_points(ideal_pt, observed_pt, eps=1e-6) -> float:
     return _wrap_to_pi(phi_obs - phi_ideal)
 
 
+def _nearest_axis(theta):
+    """Snap to nearest 90° axis."""
+    return _wrap_to_pi((np.pi/2) * round(theta / (np.pi/2)))
+
+
 def calibrate_state():
-    """use various lidar measures to apply corrections to state variables"""
-    # print('start',state_dict['state_var'])
+    """
+    Calibrate heading using IMU yaw (no lidar-based angle).
+    Retains forward (x,y) correction using front Lidar.
+    """
+    # Read sensors
     ranges = lidar.getRangeImage()
+    roll, pitch, yaw_world = imu.getRollPitchYaw()  # yaw in radians
+
+    # Current discrete facing (0:+Y, 1:+X, 2:-Y, 3:-X as in your existing logic)
     current_facing = get_facing(state_dict['state_var'])
 
-    theta_adjustment = 0
+    # Initialize IMU yaw bias once so that yaw_map aligns with your grid frame.
+    # We assume facing angles {0:0, 1:pi/2, 2:pi, 3:-pi/2} in the map frame.
+    if 'imu_yaw_bias' not in state_dict:
+        facing_to_ang = {0: 0.0, 1: np.pi/2, 2: np.pi, 3: -np.pi/2}
+        state_dict['imu_yaw_bias'] = _wrap_to_pi(yaw_world - facing_to_ang[current_facing])
+
+    # Convert raw yaw to map-aligned yaw
+    yaw_map = _wrap_to_pi(yaw_world - state_dict['imu_yaw_bias'])
+
+    # Update orientation estimate directly from IMU
+    state_dict['state_var'][2] = yaw_map
+
+    # snap to nearest cardinal axis
+    target_heading = _nearest_axis(yaw_map)
+
+    theta_adjustment = _wrap_to_pi(target_heading - yaw_map)
+
     forward_adjustment = 0
-    has_left_wall = False
-    has_right_wall = False
-    # use left wall to attempt theta correction
-    print(get_lidar_a(ranges,state_dict['state_var']),get_lidar_b(ranges,state_dict['state_var']),get_lidar_c(ranges,state_dict['state_var']),get_lidar_d(ranges,state_dict['state_var']),get_lidar_e(ranges,state_dict['state_var']))
-    if get_lidar_a(ranges,state_dict['state_var']):
-        print("use LEFT wall")
-        has_left_wall = True
-        start_alpha = (np.pi-2.9)/2
-        sample = ranges[0:53:10]
-        # alpha is angle relative to -x direction (robot frame)
-        alpha = [start_alpha+i*10/512*2.9 for i in range(len(sample))]
-        theta = alpha[-1]-alpha[0]
-        gamma_expected = np.pi/2 + start_alpha
 
-        # cosine rule
-        opposite = (sample[0]**2 + sample[-1]**2 - 2*sample[0]*sample[-1]*np.cos(theta))**0.5
-
-        # sine rule (obtuse angle)
-        gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[-1] / opposite))
-
-        # print('left',gamma_expected,gamma_actual,gamma_actual - gamma_expected)
-        theta_adjustment = gamma_actual - gamma_expected
-        state_dict['state_var'][2] += theta_adjustment
-
-
-
-    # use right wall to attempt theta correction
-    elif get_lidar_e(ranges,state_dict['state_var']):
-
-        print("use RIGHT wall")
-        has_right_wall = True
-        start_alpha = (np.pi-2.9)/2 + 2.6
-        sample = ranges[459:512:10]
-        # alpha is angle relative to -x direction (robot frame)
-        alpha = [start_alpha+i*10/512*2.9 for i in range(len(sample))]
-        theta = alpha[-1]-alpha[0]
-        gamma_expected = np.pi/2 + (np.pi-2.9)/2
-
-        # cosine rule
-        opposite = (sample[0]**2 + sample[-1]**2 - 2*sample[0]*sample[-1]*np.cos(theta))**0.5
-
-        # sine rule (obtuse angle)
-        gamma_actual = np.pi - (np.arcsin(np.sin(theta) * sample[0] / opposite))
-
-        # print('right',gamma_expected,gamma_actual,gamma_expected - gamma_actual)
-        theta_adjustment = gamma_expected - gamma_actual
-        state_dict['state_var'][2] += theta_adjustment
-
-
-    ideal_nearest_point = (65, 75)        # ideal pixel when robot faces perfectly straight
-    nearest_point = find_nearest_intersection()
-    forward_adjustment_cv = 0
-    if nearest_point is not None:
-        theta_adjustment_cv = theta_adjustment_from_points(ideal_nearest_point, nearest_point)
-        if not has_left_wall and not has_right_wall:
-            print("Use CV rotation adjustment", theta_adjustment_cv)
-            theta_adjustment = theta_adjustment_cv
-
-
-    # use forward wall to attempt x,y correction
+    # Use forward wall to attempt x,y correction (same as your original)
     if min(ranges[230:282]) < 1:
-        print("use Forward wall")
-        min_forward = min(ranges[230:282]) + 0.035 # adding radius of E-Puck
-        print("MIN forward", min_forward, current_facing)
+        min_forward = min(ranges[230:282]) + 0.035  # add e-puck radius
         if min_forward < 0.3:
-            likely_wall = int(min_forward/0.5)
+            likely_wall = int(min_forward / 0.5)
 
-
-            # a large correction likely to be a faulty reading so ingore > 0.2
             if current_facing == 0:
                 y = state_dict['state_var'][1]
-                square_y =int(y)
+                square_y = int(y)
                 wall_measured = square_y + likely_wall
-                new_y = wall_measured +1 - min_forward * 2
+                new_y = wall_measured + 1 - min_forward * 2
                 forward_adjustment = new_y - state_dict['state_var'][1]
                 if abs(forward_adjustment) < 0.5:
                     state_dict['state_var'][1] += forward_adjustment
 
             if current_facing == 1:
                 x = state_dict['state_var'][0]
-                square_x =int(x)
+                square_x = int(x)
                 wall_measured = square_x + likely_wall
-                new_x = wall_measured +1 - min_forward * 2
+                new_x = wall_measured + 1 - min_forward * 2
                 forward_adjustment = new_x - state_dict['state_var'][0]
                 if abs(forward_adjustment) < 0.5:
                     state_dict['state_var'][0] += forward_adjustment
 
             if current_facing == 2:
                 y = state_dict['state_var'][1]
-                square_y =int(y)
+                square_y = int(y)
                 wall_measured = square_y - likely_wall
                 new_y = wall_measured + min_forward * 2
                 forward_adjustment = state_dict['state_var'][1] - new_y
                 if abs(forward_adjustment) < 0.5:
                     state_dict['state_var'][1] -= forward_adjustment
+
             if current_facing == 3:
                 x = state_dict['state_var'][0]
-                square_x =int(x)
+                square_x = int(x)
                 wall_measured = square_x - likely_wall
                 new_x = wall_measured + min_forward * 2
                 forward_adjustment = state_dict['state_var'][1] - new_x
                 if abs(forward_adjustment) < 0.5:
                     state_dict['state_var'][0] -= forward_adjustment
 
-
+    # Consume the current goal (as in your original)
     state_dict['goal_stack'].pop(-1)
 
+    # Distance-to-centerline correction (unchanged)
     if current_facing == 0:
         y = state_dict['state_var'][1]
-        square_y =int(y)
-        dist_correction = square_y+0.5-y
-
-
+        square_y = int(y)
+        dist_correction = square_y + 0.5 - y
     elif current_facing == 1:
         x = state_dict['state_var'][0]
-        square_x =int(x)
-        dist_correction = square_x+0.5-x
-
+        square_x = int(x)
+        dist_correction = square_x + 0.5 - x
     elif current_facing == 2:
         y = state_dict['state_var'][1]
-        square_y =int(y)
-        dist_correction = y-(square_y+0.5)
-
-
-    if current_facing == 3:
+        square_y = int(y)
+        dist_correction = y - (square_y + 0.5)
+    else:  # current_facing == 3
         x = state_dict['state_var'][0]
-        square_x =int(x)
-        dist_correction = x-(square_x+0.5)
+        square_x = int(x)
+        dist_correction = x - (square_x + 0.5)
 
+    # Queue small forward centering if heading is already good
+    if abs(dist_correction) > 0.02:
+        state_dict['goal_stack'].append(('forward_correction', dist_correction * 0.5))
 
-    print("DIST", dist_correction)
-    # times 0.5 as converfting squares into distance
-    if abs(theta_adjustment) < 0.05 and abs(dist_correction) > 0.02:
-        state_dict['goal_stack'].append(('forward_correction',dist_correction*0.5))
-
+    # Queue turn based on IMU-derived error
     if theta_adjustment > 0.05:
-        state_dict['goal_stack'].append(('left_turn',theta_adjustment))
+        state_dict['goal_stack'].append(('left_turn', theta_adjustment))
     if theta_adjustment < -0.05:
-        state_dict['goal_stack'].append(('right_turn',-theta_adjustment))
+        state_dict['goal_stack'].append(('right_turn', -theta_adjustment))
 
 
 def route(x_y):
