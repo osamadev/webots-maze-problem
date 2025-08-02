@@ -30,20 +30,6 @@ TURN_HOLD_STEPS = 3
 REF_DISTANCES = [0.5, 0.4, 0.3, 0.2, 0.1]  # For distance estimation from wall images
 IMG_MATCH_THRESHOLD = 0.7  # SSIM threshold for wall detection
 
-def angle_wrap(a):
-    """
-    Wraps angle 'a' into the range [0, 2*pi).
-    """
-    return (a + 2 * np.pi) % (2 * np.pi)
-
-def angle_diff(current, target):
-    """
-    Computes shortest signed difference between two angles (radians).
-    Result is in range [-pi, pi].
-    """
-    d = (target - current + np.pi) % (2 * np.pi) - np.pi
-    return d
-
 # Initialize Webots robot and device handles
 robot = Robot()
 cameras = [
@@ -66,6 +52,21 @@ right_motor.setVelocity(0.0)
 
 imu = robot.getDevice('inertial unit')
 imu.enable(TIME_STEP)
+
+
+def angle_wrap(a):
+    """
+    Wraps angle 'a' into the range [0, 2*pi).
+    """
+    return (a + 2 * np.pi) % (2 * np.pi)
+
+def angle_diff(current, target):
+    """
+    Computes shortest signed difference between two angles (radians).
+    Result is in range [-pi, pi].
+    """
+    d = (target - current + np.pi) % (2 * np.pi) - np.pi
+    return d
 
 def preprocess(img, bottom_crop_frac=0.0):
     """
