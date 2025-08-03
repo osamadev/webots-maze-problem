@@ -426,7 +426,7 @@ def explore_step():
     if is_frontier_cell(cx, cy):
         state_dict['goal_stack'].append(('map_current', None))
         return
-    # print_maze(state_dict["maze"])
+   
     target = nearest_frontier_from((cx, cy))
     if target is None:
         with open('map.json', 'w') as f:
