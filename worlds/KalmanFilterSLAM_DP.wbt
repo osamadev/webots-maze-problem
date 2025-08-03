@@ -1889,6 +1889,6 @@ Robot {
       0 0 0
     ]
   }
-  controller "e_puck_custom_controller7"
+  controller "KalmanFilterController"
   cpuConsumption 1.11
 }

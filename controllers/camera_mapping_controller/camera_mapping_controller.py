@@ -426,7 +426,7 @@ def explore_step():
     if is_frontier_cell(cx, cy):
         state_dict['goal_stack'].append(('map_current', None))
         return
-    print_maze(state_dict["maze"])
+    # print_maze(state_dict["maze"])
     target = nearest_frontier_from((cx, cy))
     if target is None:
         with open('map.json', 'w') as f:
@@ -560,6 +560,8 @@ goal_stack_string_buffer = "->".join([str(goal) for goal in state_dict['goal_sta
 while robot.step(TIME_STEP) != -1:
     goal_stack_string = "->".join([str(goal) for goal in state_dict['goal_stack']])
     if goal_stack_string != goal_stack_string_buffer:
+        print_maze(state_dict['maze'])
+        print(goal_stack_string)
         goal_stack_string_buffer = goal_stack_string
     if len(state_dict['goal_stack']) > 0:
         plan = state_dict['goal_stack'][-1]
