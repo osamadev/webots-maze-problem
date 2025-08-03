@@ -320,7 +320,7 @@ Robot {
       fieldOfView 2.9
       numberOfLayers 1
       maxRange 2
-      noise 0.00375
+      noise 0.003
       resolution 0.01
     }
     HingeJoint {

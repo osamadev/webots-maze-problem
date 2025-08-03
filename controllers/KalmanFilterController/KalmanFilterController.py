@@ -41,8 +41,8 @@ dead_reckoning_forward_std_error = 0.03 # (note distance measure, not squares)
 dead_reckoning_turn_std_error = 0.08
 
 # Sensor variance for KF
-lidar_std_error = 0.00375 * 2 # i.e. the sensor 'noise' (0.005) x max_range (2m)
-lidar_theta_std_error = 0.075 # estimated numerically for typical side wall theta correction measurement
+lidar_std_error = 0.003 * 2 # i.e. the sensor 'noise' (0.005) x max_range (2m)
+lidar_theta_std_error = 0.06 # estimated numerically for typical side wall theta correction measurement
 
 ########## Load robot #########
 
