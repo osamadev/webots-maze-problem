@@ -264,7 +264,7 @@ def right_turn(theta=None):
     """
     _turn_controller(-(theta if theta is not None else (np.pi / 2)))
 
-def forward_correction(dist=None):
+def forward(dist=None):
     """
     Moves the robot forward (or backward) a specified distance (defaults to one grid cell).
     Uses the IMU to update internal state after moving.
@@ -486,7 +486,7 @@ def move_next(next_xy):
     cur_dir = get_facing(state_dict['state_var'])
     delta = (desired_dir - cur_dir) % 4
     state_dict['goal_stack'].pop(-1)
-    state_dict['goal_stack'].append(('forward_correction', GRID_SIZE))
+    state_dict['goal_stack'].append(('forward', GRID_SIZE))
     if delta == 1:
         state_dict['goal_stack'].append(('right_turn', None))
     elif delta == 3:
@@ -527,7 +527,7 @@ behaviours = {
     "route": route,
     "race": race,
     "move_next": move_next,
-    "forward_correction": forward_correction
+    "forward": forward
 }
 
 # Load map from file if available, else initialize blank map
@@ -552,7 +552,7 @@ if check_complete_mapping():
     state_dict['goal_stack'] = [("race", (1, 4)), ("calibrate_state", None)]
 else:
     print("Mapping Stage")
-    state_dict['goal_stack'] = [("explore_step", None), ("calibrate_state", None)]
+    state_dict['goal_stack'] = [("race", (1, 4)), ("explore_step", None), ("calibrate_state", None)]
 
 goal_stack_string_buffer = "->".join([str(goal) for goal in state_dict['goal_stack']])
 

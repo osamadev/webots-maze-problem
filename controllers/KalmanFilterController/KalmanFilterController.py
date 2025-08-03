@@ -428,7 +428,7 @@ def map_current():
     # if square fully mapped, remove goal as completed
     if '?' not in state_dict['map'][current_y][current_x]:
         state_dict['goal_stack'].pop(-1)
-        print_maze(state_dict['map'])
+        
         
     # else keep goal but add a turn goal to complete first
     # this should ensure square is fully mapped 
@@ -1129,6 +1129,7 @@ while robot.step(TIME_STEP) != -1:
     # This simply manages the printout of goals to the screen for illustration
     goal_stack_string = "->".join([str(goal) for goal in state_dict['goal_stack']])
     if goal_stack_string != goal_stack_string_buffer:
+        print_maze(state_dict['map'])
         print(goal_stack_string)
         goal_stack_string_buffer = goal_stack_string
     
