@@ -38,11 +38,11 @@ wall_error = 0.08
 
 # Dead reckoning KF error values estimated by extracting error values with zero sensor noise
 dead_reckoning_forward_std_error = 0.03 # (note distance measure, not squares)
-dead_reckoning_turn_std_error = 0.12
+dead_reckoning_turn_std_error = 0.08
 
 # Sensor variance for KF
-lidar_std_error = 0.005 * 2 # i.e. the sensor 'noise' (0.005) x max_range (2m)
-lidar_theta_std_error = 0.1 # estimated numerically for typical side wall theta correction measurement
+lidar_std_error = 0.00375 * 2 # i.e. the sensor 'noise' (0.005) x max_range (2m)
+lidar_theta_std_error = 0.075 # estimated numerically for typical side wall theta correction measurement
 
 ########## Load robot #########
 
@@ -145,6 +145,40 @@ def get_rel_wall_position_forward(facing):
     else:
         return -1
         
+def print_maze(maze):
+    """Function to pretty print the accumulated map to console."""
+    print("____________________________")
+    rows = len(maze)      # grid_y (y: up)
+    cols = len(maze[0])   # grid_x (x: across)
+
+    # Print from top row (highest y) to bottom row (y=0)
+    for y in range(rows-1, -1, -1):
+        visited_chars = []
+        for x in range(cols):
+            cell = maze[y][x]
+            # Visited if all walls are known (not '?')
+            if '?' in cell:
+                visited_chars.append("?")
+            else:
+                visited_chars.append("V")
+        # Top wall row
+        top_row = "|  " + "\t  ".join(str(maze[y][x][0]) for x in range(cols)) + "   |"
+        print(top_row)
+        # Middle row: left wall, visited, right wall
+        middle_parts = []
+        for x in range(cols):
+            cell = maze[y][x]
+            cell_part = f"{cell[3]} {visited_chars[x]} {cell[1]}"
+            middle_parts.append(cell_part)
+        middle_row = "|" + "\t".join(middle_parts) + " |"
+        print(middle_row)
+        # Bottom wall row
+        bottom_row = "|  " + "\t  ".join(str(maze[y][x][2]) for x in range(cols)) + "   |"
+        print(bottom_row)
+        if y == 0:
+            print("|___________________________|\n")
+        else:
+            print("|                           ")
 
 ########## lidar wall detection functions ##########
 
@@ -394,6 +428,7 @@ def map_current():
     # if square fully mapped, remove goal as completed
     if '?' not in state_dict['map'][current_y][current_x]:
         state_dict['goal_stack'].pop(-1)
+        print_maze(state_dict['map'])
         
     # else keep goal but add a turn goal to complete first
     # this should ensure square is fully mapped 
@@ -707,6 +742,7 @@ def calibrate_state():
     
     # Empty counters for adjustments
     total_theta_adjustment = 0
+    Kt = 0
     number_theta_measurements = 0
     forward_adjustment = 0
     
@@ -747,7 +783,7 @@ def calibrate_state():
         theta_adjustment = sum(theta_adjustments )/len(theta_adjustments) 
         
         # Accumulate these errors into total (prior total will be zero if this is first wall checked)
-        total_theta_adjustment += (total_theta_adjustment*number_theta_measurements + theta_adjustment *n)/(number_theta_measurements + n)
+        total_theta_adjustment = (total_theta_adjustment*number_theta_measurements + theta_adjustment *n)/(number_theta_measurements + n)
         
         # Keep record of number of measurements included in estimate
         number_theta_measurements += n
@@ -791,7 +827,7 @@ def calibrate_state():
         theta_adjustment = sum(theta_adjustments )/len(theta_adjustments)    
         
         # Accumulate these errors into total (prior total will be zero if this is first wall checked)
-        total_theta_adjustment += (total_theta_adjustment*number_theta_measurements + theta_adjustment *n)/(number_theta_measurements + n)
+        total_theta_adjustment = (total_theta_adjustment*number_theta_measurements + theta_adjustment *n)/(number_theta_measurements + n)
         
         # Keep record of number of measurements included in estimate
         number_theta_measurements += n
@@ -800,11 +836,11 @@ def calibrate_state():
     if number_theta_measurements > 0:
     
         # Kalman gain
-        K = state_dict['state_var'][5]/(state_dict['state_var'][5] + lidar_theta_std_error**2 /number_theta_measurements)
+        Kt = state_dict['state_var'][5]/(state_dict['state_var'][5] + lidar_theta_std_error**2 /number_theta_measurements)
         
         # Update theta with innovation and Kalman gain and theta variance
-        state_dict['state_var'][2] += K*total_theta_adjustment 
-        state_dict['state_var'][5] = (1-K)*state_dict['state_var'][5]
+        state_dict['state_var'][2] += Kt*total_theta_adjustment 
+        state_dict['state_var'][5] = (1-Kt)*state_dict['state_var'][5]
     
     
     # Now use forward wall to attempt x,y correction
@@ -872,37 +908,57 @@ def calibrate_state():
     # Remove this goal     
     state_dict['goal_stack'].pop(-1)
    
-    # Now set additional goal to turn or move to correct position to middle of square
-    
+    # Now set additional goal to turn or move to correct position depending on facing
     if current_facing == 0:
         y = state_dict['state_var'][1]
         square_y =int(y)
         dist_correction = square_y+0.5-y
+        
+        theta = state_dict['state_var'][2]
+        theta_correction = format_radians(0 - theta)
+        if theta_correction > np.pi:
+            theta_correction = theta_correction - 2*np.pi
         
     elif current_facing == 1:
         x = state_dict['state_var'][0]
         square_x =int(x)
         dist_correction = square_x+0.5-x
         
+        theta = state_dict['state_var'][2]
+        theta_correction = format_radians(np.pi/2 - theta)
+        if theta_correction > np.pi:
+            theta_correction = theta_correction - 2*np.pi
+        
     elif current_facing == 2:
         y = state_dict['state_var'][1]
         square_y =int(y)
         dist_correction = y-(square_y+0.5)
+        
+        theta = state_dict['state_var'][2]
+        theta_correction = format_radians(np.pi - theta)
+        if theta_correction > np.pi:
+            theta_correction = theta_correction - 2*np.pi
         
     if current_facing == 3:
         x = state_dict['state_var'][0]
         square_x =int(x)
         dist_correction = x-(square_x+0.5)
         
-    # If both theta and dist need correction, only add theta move goal - dist get added in later cycle
-    if abs(dist_correction) > 0.02 and abs(total_theta_adjustment) <= 0.05:
+        theta = state_dict['state_var'][2]
+        theta_correction = format_radians(3/2*np.pi - theta)
+        if theta_correction > np.pi:
+            theta_correction = theta_correction - 2*np.pi
+        
+    # If both theta and dist need correction, only add theta move goal
+    # as dist will be corrected in next cycle
+    if abs(dist_correction) > 0.02 and abs(theta_correction) <= 0.06:
     # times 0.5 as converting squares into distance
         state_dict['goal_stack'].append(('forward',dist_correction*0.5))
     
-    if total_theta_adjustment > 0.05:
-        state_dict['goal_stack'].append(('left_turn',total_theta_adjustment))
-    if total_theta_adjustment < -0.05:
-        state_dict['goal_stack'].append(('right_turn',-total_theta_adjustment)) 
+    if theta_correction < -0.06:
+        state_dict['goal_stack'].append(('left_turn',-theta_correction))
+    if theta_correction > 0.06:
+        state_dict['goal_stack'].append(('right_turn',theta_correction))  
     
        
 def route(x_y):
