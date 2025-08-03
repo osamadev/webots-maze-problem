@@ -147,7 +147,7 @@ def get_rel_wall_position_forward(facing):
         
 def print_maze(maze):
     """Function to pretty print the accumulated map to console."""
-    print("____________________________")
+    print("___________________________________")
     rows = len(maze)      # grid_y (y: up)
     cols = len(maze[0])   # grid_x (x: across)
 
@@ -176,7 +176,7 @@ def print_maze(maze):
         bottom_row = "|  " + "\t  ".join(str(maze[y][x][2]) for x in range(cols)) + "   |"
         print(bottom_row)
         if y == 0:
-            print("|___________________________|\n")
+            print("|__________________________________|\n")
         else:
             print("|                           ")
 
