@@ -11,6 +11,8 @@ A Webots simulation where an adapted e-puck robot maps a small grid maze and the
 - **Planner:** wavefront (BFS) for nearest-frontier exploration and goal routing.  
 - **Persistence:** map saved/loaded (`map.json`) between runs.
 
+  <p align="center"><img src="map.png" alt="Maze map after exploration" width="400"/></p>
+
 ## Repository structure
 - controllers/                 # Python controllers (main maze controller lives here)
 - protos/                      # Custom PROTOs
