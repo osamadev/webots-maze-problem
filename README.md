@@ -1,4 +1,4 @@
-# Webots Maze Problem
+# MicroMouse: Development of A Behaviour-based robot to solve a maze Scenario 
 
 A Webots simulation where an adapted e-puck robot maps a small grid maze and then navigates to a goal using a simple BDI-style controller in Python. The controller builds a 5×5 cell-edge map from LiDAR, keeps the robot centered in each cell, and plans shortest paths with a wavefront/BFS strategy.
 
