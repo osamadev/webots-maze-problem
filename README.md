@@ -11,7 +11,7 @@ A Webots simulation where an adapted e-puck robot maps a small grid maze and the
 
 ## Repository structure
 - controllers/                 # Python controllers (main maze controller lives here)
-- protos/                      # Custom PROTOs (if any)
+- protos/                      # Custom PROTOs
 - worlds/                      # Webots world(s) for the maze
 
 ## Requirements
