@@ -4,6 +4,8 @@ A Webots simulation where an adapted e-puck robot maps a small grid maze and the
 
 ![Custom E-Puck in 5 x 5 Maze](maze_design_with_e-puck.png)
 
+<img src="maze_design_with_e-puck.png" alt="Custom E-Puck in 5 x 5 Maze" width="500"/>
+
 ## Features
 - **Grid mapping:** cell-edge representation `[N,E,S,W] ∈ {wall, open, ?}` with post-scan harmonization.  
 - **LiDAR-based wall inference:** five angular windows (left, front-left, forward, front-right, right) and an SSE threshold test.  
