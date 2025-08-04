@@ -10,11 +10,9 @@ A Webots simulation where an adapted e-puck robot maps a small grid maze and the
 - **Persistence:** map saved/loaded (`map.json`) between runs.
 
 ## Repository structure
-controllers/ # Python controllers (main maze controller lives here)
-protos/ # Custom PROTOs (if any)
-worlds/ # Webots world(s) for the maze
-robots_current_position_and_direction.py # Helper to print/log robot pose
-
+- controllers/                 # Python controllers (main maze controller lives here)
+- protos/                      # Custom PROTOs (if any)
+- worlds/                      # Webots world(s) for the maze
 
 ## Requirements
 - **Webots** (recent version) with Python controller support
