@@ -2,9 +2,7 @@
 
 A Webots simulation where an adapted e-puck robot maps a small grid maze and then navigates to a goal using a simple BDI-style controller in Python. The controller builds a 5×5 cell-edge map from LiDAR, keeps the robot centered in each cell, and plans shortest paths with a wavefront/BFS strategy.
 
-![Custom E-Puck in 5 x 5 Maze](maze_design_with_e-puck.png)
-
-<img src="maze_design_with_e-puck.png" alt="Custom E-Puck in 5 x 5 Maze" width="600"/>
+<p align="center"><img src="maze_design_with_e-puck.png" alt="Custom E-Puck in 5 x 5 Maze" width="600"/></p>
 
 ## Features
 - **Grid mapping:** cell-edge representation `[N,E,S,W] ∈ {wall, open, ?}` with post-scan harmonization.  
